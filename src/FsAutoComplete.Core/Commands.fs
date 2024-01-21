@@ -93,7 +93,7 @@ module Commands =
 
   let fantomasLogger = LogProvider.getLoggerByName "Fantomas"
   let commandsLogger = LogProvider.getLoggerByName "Commands"
-  
+
   let fsharpLintLogger = LogProvider.getLoggerByName "FSharpLint"
   let fsharpLintService: FSharpLintService = new LSPFSharpLintService() :> FSharpLintService
 
@@ -1469,7 +1469,7 @@ module Commands =
 
         return [||]
     }
-    
+
 open Utils.Tracing
 open FsAutoComplete.Telemetry
 
@@ -1768,12 +1768,12 @@ type Commands() =
     (tyRes: ParseAndCheckResults)
     (file: SourceFilePath)
     =
-      asyncResult {  
+      asyncResult {
         let tags =
           [ SemanticConventions.fsac_sourceCodePath, box (file) ]
 
         use _ = fsacActivitySource.StartActivityForType(typeof<Commands>, tags = tags)
-        
+
         let file = Path.GetFullPath file
         let tree = tyRes.GetAST
         let! warnings = Lint.lintFile tree source file (tyRes.GetCheckResults)
