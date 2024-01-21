@@ -8,6 +8,7 @@ open FSharpLint.Client.Contracts
 open FSharpLint.Client.LSPFSharpLintService
 open FsToolkit.ErrorHandling
 open FSharpLint.Client.LSPFSharpLintServiceTypes
+open System
 
 let logger = LogProvider.getLoggerByName "FSharpLint"
 
@@ -50,7 +51,7 @@ let lintRangeToLsp (range: ClientRange): Ionide.LanguageServerProtocol.Types.Ran
       { Line = range.EndLine - 1
         Character = range.EndColumn } }
 
-let lintFile ctok ast (sourceCode: ISourceText) filePath typeCheckResults =
+let lintFile ast (sourceCode: ISourceText) filePath typeCheckResults =
   asyncResult {
     //TODO: do nothing if no fsharplint.json ? (what about default config)
     let _ = ast
@@ -61,14 +62,17 @@ let lintFile ctok ast (sourceCode: ISourceText) filePath typeCheckResults =
       { FilePath = filePath
         LintConfigPath = None //TODO: get proper config from project or overriden by ionide config ?
       }
+    let! ct = Async.CancellationToken
+
+    // Async.Sleep (TimeSpan.FromSeconds 10) |> ignore
 
     try
-      let! res = fsharpLintService.LintFileAsync(req, ctok)
+      let! res = fsharpLintService.LintFileAsync(req, ct)
       match LanguagePrimitives.EnumOfValue res.Code, res.Result with
-      | FSharpLintResponseCode.Linted, LintResult warnings ->
+      | FSharpLintResponseCode.OkLint, LintResult warnings ->
           let splitWarnings = warnings |> List.map enrichLintWarning
           return! Ok splitWarnings
-      | FSharpLintResponseCode.Error, Content message ->
+      | FSharpLintResponseCode.OkLintError, Content message ->
           logger.error (
             Log.setMessage "Fatal error in linter: {message}"
             >> Log.addContextDestructured "message" message)

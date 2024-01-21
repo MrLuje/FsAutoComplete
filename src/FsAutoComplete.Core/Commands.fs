@@ -1196,6 +1196,9 @@ module Commands =
 
         return [||]
     }
+    
+open Utils.Tracing
+open FsAutoComplete.Telemetry
 
 type Commands() =
 
@@ -1475,10 +1478,14 @@ type Commands() =
     (tyRes: ParseAndCheckResults)
     (file: SourceFilePath)
     =
-      asyncResult {
+      asyncResult {  
+        let tags =
+          [ SemanticConventions.fsac_sourceCodePath, box (file) ]
+
+        use _ = fsacActivitySource.StartActivityForType(typeof<Commands>, tags = tags)
+        
         let file = Path.GetFullPath file
         let tree = tyRes.GetAST
-        let! ct = Async.CancellationToken
-        let! warnings = Lint.lintFile ct tree source file (tyRes.GetCheckResults)
+        let! warnings = Lint.lintFile tree source file (tyRes.GetCheckResults)
         return warnings
     }

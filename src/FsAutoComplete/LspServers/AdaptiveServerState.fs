@@ -38,6 +38,7 @@ open FsAutoComplete.Lsp.Helpers
 
 open FSharpLint.Client.LSPFSharpLintService
 open FSharpLint.Client.Contracts
+open System.Diagnostics
 
 [<RequireQualifiedAccess>]
 type WorkspaceChosen =
@@ -375,9 +376,11 @@ type AdaptiveState(lspClient: FSharpLspClient, sourceTextFactory: ISourceTextFac
       async {
         try
           use progress = new ServerProgressReport(lspClient)
-          do! progress.Begin($"Linting {fileName}...", message = filePathUntag)
           let! ct = Async.CancellationToken
+          let sw = Stopwatch.StartNew()
           let! res = Commands.Lint source tyRes filePathUntag
+          sw.Stop()
+          do! progress.Begin($"[{DateTime.Now.ToLongTimeString()}] Linting {fileName} in {sw.ElapsedMilliseconds}ms...", message = filePathUntag)
           match res with
           | Ok enrichedWarnings -> 
               notifications.Trigger(NotificationEvent.Lint(filePath, enrichedWarnings, file.Version), ct)
