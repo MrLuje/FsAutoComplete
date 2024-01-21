@@ -43,6 +43,7 @@ open FSharp.Analyzers.SDK
 open Serilog.Extensions.Logging
 open FSharpLint.Client.LSPFSharpLintService
 open FSharpLint.Client.Contracts
+open System.Diagnostics
 
 /// <summary>Handle tracking in-flight ServerProgressReport and allow cancellation of actions if a client decides to.</summary>
 type ServerProgressLookup() =
@@ -534,9 +535,11 @@ type AdaptiveState
       async {
         try
           use progress = new ServerProgressReport(lspClient)
-          do! progress.Begin($"Linting {fileName}...", message = filePathUntag)
           let! ct = Async.CancellationToken
+          let sw = Stopwatch.StartNew()
           let! res = Commands.Lint source tyRes filePathUntag
+          sw.Stop()
+          do! progress.Begin($"[{DateTime.Now.ToLongTimeString()}] Linting {fileName} in {sw.ElapsedMilliseconds}ms...", message = filePathUntag)
           match res with
           | Ok enrichedWarnings ->
               notifications.Trigger(NotificationEvent.Lint(filePath, enrichedWarnings, file.Version), ct)
