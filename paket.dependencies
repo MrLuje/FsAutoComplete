@@ -29,7 +29,8 @@ nuget Microsoft.CodeAnalysis 4.5.0
 nuget FSharp.Analyzers.SDK 0.25.0
 nuget ICSharpCode.Decompiler
 nuget Mono.Cecil >= 0.11.4
-nuget FSharpLint.Core
+nuget Newtonsoft.Json
+nuget System.Configuration.ConfigurationManager
 nuget Serilog >= 2.10.0
 nuget Serilog.Sinks.File >= 5.0.0
 nuget Serilog.Sinks.Console >= 4.0.0
@@ -62,6 +63,8 @@ nuget System.Security.Cryptography.Pkcs 6.0.4
 nuget System.Net.Http 4.3.4 # pinned for security reasons
 nuget System.Text.RegularExpressions 4.3.1 # pinned for security reasons
 
+source /home/vince/src/github/mrluje/FSharpLint.worktrees/rw/make_it_all_6/out
+nuget FSharpLint.Client
 
 group Build
   source https://api.nuget.org/v3/index.json
