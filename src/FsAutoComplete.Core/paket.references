@@ -5,6 +5,7 @@ FsToolkit.ErrorHandling.TaskResult
 Fantomas.Client
 FSharp.Data.Adaptive
 IcedTasks
+FSharpLint.Client
 Microsoft.Build.Utilities.Core
 Ionide.LanguageServerProtocol
 Ionide.KeepAChangelog.Tasks
