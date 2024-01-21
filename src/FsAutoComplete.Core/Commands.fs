@@ -32,7 +32,7 @@ type LocationResponse<'a> = Use of 'a
 type HelpText =
   | Simple of symbol: string * text: string
   | Full of symbol: string * tip: ToolTipText * textEdits: CompletionNamespaceInsert option
-
+ 
 [<RequireQualifiedAccess>]
 type CoreResponse<'a> =
   | InfoRes of text: string
@@ -91,10 +91,7 @@ module Commands =
   open System.Collections.Concurrent
   let fantomasLogger = LogProvider.getLoggerByName "Fantomas"
   let commandsLogger = LogProvider.getLoggerByName "Commands"
-  
-  let fsharpLintLogger = LogProvider.getLoggerByName "FSharpLint"
-  let fsharpLintService: FSharpLintService = new LSPFSharpLintService() :> FSharpLintService
-
+    
   let addFile (fsprojPath: string) fileVirtPath =
     async {
       try
