@@ -22,6 +22,8 @@ open FSharp.Compiler.Symbols
 open System.Collections.Generic
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text.Range
+open FSharpLint.Client.Contracts
+open FSharpLint.Client.LSPFSharpLintService
 
 [<RequireQualifiedAccess>]
 type LocationResponse<'a> = Use of 'a
@@ -77,7 +79,7 @@ type NotificationEvent =
   | Workspace of ProjectSystem.ProjectResponse
   | AnalyzerMessage of messages: FSharp.Analyzers.SDK.Message[] * file: string<LocalPath> * version: int
   | UnusedOpens of file: string<LocalPath> * opens: Range[] * version: int
-  // | Lint of file: string<LocalPath> * warningsWithCodes: Lint.EnrichedLintWarning list
+  | Lint of file: string<LocalPath> * warningsWithCodes: Lint.EnrichedLintWarning list * version: int
   | UnusedDeclarations of file: string<LocalPath> * decls: range[] * version: int
   | SimplifyNames of file: string<LocalPath> * names: SimplifyNames.SimplifiableRange[] * version: int
   | UnnecessaryParentheses of file: string<LocalPath> * ranges: range[] * version: int
@@ -89,6 +91,9 @@ module Commands =
   open System.Collections.Concurrent
   let fantomasLogger = LogProvider.getLoggerByName "Fantomas"
   let commandsLogger = LogProvider.getLoggerByName "Commands"
+  
+  let fsharpLintLogger = LogProvider.getLoggerByName "FSharpLint"
+  let fsharpLintService: FSharpLintService = new LSPFSharpLintService() :> FSharpLintService
 
   let addFile (fsprojPath: string) fileVirtPath =
     async {
@@ -1464,3 +1469,16 @@ type Commands() =
         ShowParameterHints = defaultArg showParameterHints true }
 
     FsAutoComplete.Core.InlayHints.provideHints (text, tyRes, range, hintConfig)
+
+  static member Lint
+    (source: ISourceText)
+    (tyRes: ParseAndCheckResults)
+    (file: SourceFilePath)
+    =
+      asyncResult {
+        let file = Path.GetFullPath file
+        let tree = tyRes.GetAST
+        let! ct = Async.CancellationToken
+        let! warnings = Lint.lintFile ct tree source file (tyRes.GetCheckResults)
+        return warnings
+    }

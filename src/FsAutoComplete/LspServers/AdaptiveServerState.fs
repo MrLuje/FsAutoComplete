@@ -36,6 +36,8 @@ open FsAutoComplete.FCSPatches
 open FsAutoComplete.Lsp
 open FsAutoComplete.Lsp.Helpers
 
+open FSharpLint.Client.LSPFSharpLintService
+open FSharpLint.Client.Contracts
 
 [<RequireQualifiedAccess>]
 type WorkspaceChosen =
@@ -369,10 +371,25 @@ type AdaptiveState(lspClient: FSharpLspClient, sourceTextFactory: ISourceTextFac
     let inline isNotExcluded (exclusions: Regex array) =
       exclusions |> Array.exists (fun r -> r.IsMatch filePathUntag) |> not
 
+    let lint = 
+      async {
+        try
+          use progress = new ServerProgressReport(lspClient)
+          do! progress.Begin($"Linting {fileName}...", message = filePathUntag)
+          let! ct = Async.CancellationToken
+          let! res = Commands.Lint source tyRes filePathUntag
+          match res with
+          | Ok enrichedWarnings -> 
+              notifications.Trigger(NotificationEvent.Lint(filePath, enrichedWarnings, file.Version), ct)
+          | Error _ -> ()
+        with e ->
+          logger.error (Log.setMessage "lint failed" >> Log.addExn e)
+      }
+
     let analyzers =
       [
-        // if config.Linter then
-        //   commands.Lint filePath |> Async .Ignore
+        if config.Linter then
+          lint
         if config.UnusedOpensAnalyzer && isNotExcluded config.UnusedOpensAnalyzerExclusions then
           checkUnusedOpens
         if
@@ -562,45 +579,34 @@ type AdaptiveState(lspClient: FSharpLspClient, sourceTextFactory: ISourceTextFac
                   CodeDescription = None })
 
             diagnosticCollections.SetFor(uri, "F# unnecessary parentheses", version, diags)
+            
+          | NotificationEvent.Lint (file, warnings, version) ->
+              let uri = Path.LocalPathToUri file
 
-          // | NotificationEvent.Lint (file, warnings) ->
-          //     let uri = Path.LocalPathToUri file
-          //     // let fs =
-          //     //     warnings |> List.choose (fun w ->
-          //     //         w.Warning.Details.SuggestedFix
-          //     //         |> Option.bind (fun f ->
-          //     //             let f = f.Force()
-          //     //             let range = fcsRangeToLsp w.Warning.Details.Range
-          //     //             f |> Option.map (fun f -> range, {Range = range; NewText = f.ToText})
-          //     //         )
-          //     //     )
-
-          //     let diags =
-          //         warnings
-          //         |> List.map(fun w ->
-          //             let range = fcsRangeToLsp w.Warning.Details.Range
-          //             let fixes =
-          //               match w.Warning.Details.SuggestedFix with
-          //               | None -> None
-          //               | Some lazyFix ->
-          //                 match lazyFix.Value with
-          //                 | None -> None
-          //                 | Some fix ->
-          //                   Some (box [ { Range = fcsRangeToLsp fix.FromRange; NewText = fix.ToText } ] )
-          //             let uri = Option.ofObj w.HelpUrl |> Option.map (fun url -> { Href = Some (Uri url) })
-          //             { Range = range
-          //               Code = Some w.Code
-          //               Severity = Some DiagnosticSeverity.Information
-          //               Source = "F# Linter"
-          //               Message = w.Warning.Details.Message
-          //               RelatedInformation = None
-          //               Tags = None
-          //               Data = fixes
-          //               CodeDescription = uri }
-          //         )
-          //         |> List.sortBy (fun diag -> diag.Range)
-          //         |> List.toArray
-          //     diagnosticCollections.SetFor(uri, "F# Linter", diags)
+              let diags =
+                  warnings
+                  |> List.map(fun w ->
+                      let range = Lint.lintRangeToLsp w.Warning.Details.Range
+                      let fixes =
+                        match w.Warning.Details.SuggestedFix with
+                        | None -> None
+                        | Some fix ->
+                            Some ([ { Range = Lint.lintRangeToLsp fix.FromRange; NewText = fix.ToText } ])
+                          |> Option.map Ionide.LanguageServerProtocol.Server.serialize
+                      let uri = Option.ofObj w.HelpUrl |> Option.map (fun url -> { Href = Some (Uri url) })
+                      { Range = range
+                        Code = Some w.Code
+                        Severity = Some DiagnosticSeverity.Information
+                        Source = Some "F# Linter"
+                        Message = w.Warning.Details.Message
+                        RelatedInformation = None
+                        Tags = None
+                        Data = fixes
+                        CodeDescription = uri }
+                  )
+                  |> List.sortBy (fun diag -> diag.Range)
+                  |> List.toArray
+              diagnosticCollections.SetFor(uri, "F# Linter", version, diags)
 
           | NotificationEvent.Canceled(msg) ->
             let ntf: PlainNotification = { Content = msg }

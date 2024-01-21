@@ -55,7 +55,7 @@
     <Compile Include="RecordStubGenerator.fs" />
     <Compile Include="AbstractClassStubGenerator.fs" />
     <Compile Include="Fsdn.fs" />
-    <!-- <Compile Include="Lint.fs" /> -->
+    <Compile Include="Lint.fs" />
     <Compile Include="SignatureHelp.fs" />
     <Compile Include="InlayHints.fs" />
     <Compile Include="SymbolLocation.fs" />
