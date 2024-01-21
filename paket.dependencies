@@ -18,16 +18,17 @@ nuget FSharp.Analyzers.Build
 nuget Ionide.ProjInfo >= 0.74.1
 nuget Ionide.ProjInfo.FCS >= 0.74.1
 nuget Ionide.ProjInfo.ProjectSystem >= 0.74.1
-nuget Microsoft.Build >= 17.2 copy_local:false
+nuget Microsoft.Build >= 17.14.28 copy_local:false #TODO: review this bump
 nuget Microsoft.Build.Framework >= 17.4 copy_local:false
 nuget Microsoft.Build.Utilities.Core >= 17.4 copy_local:false
-nuget Microsoft.Build.Tasks.Core >= 17.4 copy_local: false
+nuget Microsoft.Build.Tasks.Core >= 17.14.28 copy_local: false #TODO: review this bump
 nuget Nuget.Frameworks >= 6.3 copy_local: false
 nuget Microsoft.CodeAnalysis
 nuget FSharp.Analyzers.SDK 0.34.1
 nuget ICSharpCode.Decompiler
 nuget Mono.Cecil >= 0.11.4
-nuget FSharpLint.Core
+nuget Newtonsoft.Json
+nuget System.Configuration.ConfigurationManager
 nuget Serilog >= 2.10.0
 nuget Serilog.Sinks.File >= 5.0.0
 nuget Serilog.Sinks.Console >= 4.0.0
@@ -63,6 +64,8 @@ nuget System.Security.Cryptography.Pkcs
 nuget System.Net.Http
 nuget System.Text.RegularExpressions
 
+source /home/vince/src/github/mrluje/FSharpLint.worktrees/rw/make_it_all_6/out
+nuget FSharpLint.Client
 
 ## Test Explorer
 nuget Microsoft.TestPlatform.TranslationLayer
