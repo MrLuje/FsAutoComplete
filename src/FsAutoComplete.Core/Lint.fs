@@ -12,8 +12,8 @@ open System
 
 let logger = LogProvider.getLoggerByName "FSharpLint"
 
-let fsharpLintService: FSharpLintService =
-  new LSPFSharpLintService() :> FSharpLintService
+let fsharpLintService: IFSharpLintService =
+  new LSPFSharpLintService() :> IFSharpLintService
 
 type EnrichedLintWarning =
   { Warning: ClientLintWarning
