@@ -2913,6 +2913,29 @@ module Foo =
 
   let foo = DateTime.Now
           """
+
+      testCaseAsync "Root module"
+      <| CodeFix.check
+        server
+        """
+module Root
+
+module Nested =
+
+  let foo () =
+    $0DateTime.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+module Root
+
+module Nested =
+  open System
+
+  let foo () =
+    DateTime.Now
+        """
       //TODO: Implement & unify with `Completion.AutoOpen` (`CompletionTests.fs`)
       // Issues:
       // * Complex because of nesting modules (-> where to open)

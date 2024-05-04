@@ -314,6 +314,7 @@ type FSharpConfigDto =
     PipelineHints: InlineValueDto option
     InlayHints: InlayHintDto option
     Fsac: FSACDto option
+    OpenNamespacePreference: OpenStatementInsertionPoint option
     Notifications: NotificationsDto option
     Debug: DebugDto option }
 
@@ -413,6 +414,7 @@ type FSharpConfig =
     CodeLenses: CodeLensConfig
     InlayHints: InlayHintsConfig
     InlineValues: InlineValuesConfig
+    OpenNamespacePreference: OpenStatementInsertionPoint
     Notifications: NotificationsConfig
     Fsac: FSACConfig
     Debug: DebugConfig }

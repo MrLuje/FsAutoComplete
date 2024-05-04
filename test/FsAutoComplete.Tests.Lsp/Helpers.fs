@@ -285,6 +285,7 @@ let defaultConfigDto: FSharpConfigDto =
       Some
         { Enabled = Some true
           Prefix = Some "//" }
+    OpenNamespacePreference = None
     Notifications = None
     Fsac = None
     Debug = None }

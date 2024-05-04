@@ -100,3 +100,11 @@ type CompletionNamespaceInsert =
   { Namespace: string
     Position: Position
     Scope: ScopeKind }
+
+type NamespaceInsert = 
+  { Line : int
+    Column : int
+    Namespace : string
+    DisplayText : string
+    InsertText : string
+    ScopeKind : ScopeKind option }

@@ -686,6 +686,7 @@ type FSharpConfigDto =
     PipelineHints: InlineValueDto option
     InlayHints: InlayHintDto option
     Fsac: FSACDto option
+    OpenNamespacePreference: OpenStatementInsertionPoint option
     Notifications: NotificationsDto option
     Debug: DebugDto option }
 
@@ -830,6 +831,7 @@ type FSharpConfig =
     CodeLenses: CodeLensConfig
     InlayHints: InlayHintsConfig
     InlineValues: InlineValuesConfig
+    OpenNamespacePreference: OpenStatementInsertionPoint
     Notifications: NotificationsConfig
     Fsac: FSACConfig
     Debug: DebugConfig }
@@ -881,6 +883,7 @@ type FSharpConfig =
       CodeLenses = CodeLensConfig.Default
       InlayHints = InlayHintsConfig.Default
       InlineValues = InlineValuesConfig.Default
+      OpenNamespacePreference = OpenStatementInsertionPoint.Nearest
       Notifications = NotificationsConfig.Default
       Fsac = FSACConfig.Default
       Debug = DebugConfig.Default }
@@ -962,6 +965,7 @@ type FSharpConfig =
         | Some ivDto ->
           { Enabled = ivDto.Enabled |> Option.defaultValue true |> Some
             Prefix = ivDto.Prefix |> Option.defaultValue "//" |> Some }
+      OpenNamespacePreference = defaultArg dto.OpenNamespacePreference OpenStatementInsertionPoint.Nearest
       Notifications =
         dto.Notifications
         |> Option.map NotificationsConfig.FromDto
@@ -1073,6 +1077,7 @@ type FSharpConfig =
       InlineValues =
         { Enabled = defaultArg (dto.PipelineHints |> Option.map (fun n -> n.Enabled)) x.InlineValues.Enabled
           Prefix = defaultArg (dto.PipelineHints |> Option.map (fun n -> n.Prefix)) x.InlineValues.Prefix }
+      OpenNamespacePreference = defaultArg dto.OpenNamespacePreference OpenStatementInsertionPoint.Nearest
       Notifications =
         dto.Notifications
         |> Option.map x.Notifications.AddDto

@@ -2108,7 +2108,7 @@ type AdaptiveState
       [| Run.ifEnabled (fun _ -> config.UnusedOpensAnalyzer) (RemoveUnusedOpens.fix forceFindSourceText)
          Run.ifEnabled
            (fun _ -> config.ResolveNamespaces)
-           (ResolveNamespace.fix tryGetParseAndCheckResultsForFile Commands.getNamespaceSuggestions)
+           (ResolveNamespace.fix tryGetParseAndCheckResultsForFile Commands.getNamespaceSuggestions config.OpenNamespacePreference)
          ReplaceWithSuggestion.fix
          RemoveRedundantQualifier.fix
          Run.ifEnabled
