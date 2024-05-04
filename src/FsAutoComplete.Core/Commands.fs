@@ -188,7 +188,6 @@ module OpenNamespace =
       DisplayText = openText
       InsertText = lineStr
       ScopeKind = None }
-    // docLine, 0, lineStr, openText
 
   let insertNearest 
     (ns: string)
@@ -847,23 +846,23 @@ module Commands =
     |> AsyncResult.bimap id (fun _ -> CoreResponse.InfoRes "Couldn't find file content")
 
   let calculateNamespaceInsert
-    currentAst
+    (currentAst: unit -> ParsedInput option)
     (decl: DeclarationListItem)
     (pos: Position)
     getLine
     : CompletionNamespaceInsert option =
     let getLine (p: Position) = getLine p |> Option.defaultValue ""
 
-    decl.NamespaceToOpen
-    |> Option.bind (fun n ->
-      (currentAst ())
-      |> Option.bind (fun ast ->
-        let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos getLine
-        insertion.ScopeKind
-        |> Option.map(fun scopeKind ->
-            { Namespace = insertion.Namespace
-              Position = Position.mkPos (insertion.Line) (insertion.Column)
-              Scope = scopeKind })))
+    option {
+      let! n = decl.NamespaceToOpen
+      let! ast = (currentAst())
+      let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos getLine
+      let! scopeKind = insertion.ScopeKind
+      return
+        { Namespace = insertion.Namespace
+          Position = Position.mkPos (insertion.Line) (insertion.Column)
+          Scope = scopeKind }
+    }
         
   let symbolUseWorkspaceAux
     (getDeclarationLocation: FSharpSymbolUse * IFSACSourceText -> Async<SymbolDeclarationLocation option>)
