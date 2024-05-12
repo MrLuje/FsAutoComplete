@@ -442,7 +442,7 @@ module Commands =
       | _ -> return CoreResponse.InfoRes "Record at position not found"
     }
 
-  let getNamespaceSuggestions (tyRes: ParseAndCheckResults) (pos: Position) (line: LineStr) =
+  let getNamespaceSuggestions (tyRes: ParseAndCheckResults) (pos: Position) (line: LineStr) (openNamespacePreference: OpenStatementInsertionPoint) =
     async {
       match Lexer.findLongIdents (pos.Column, line) with
       | None -> return CoreResponse.InfoRes "Ident not found"
@@ -500,7 +500,7 @@ module Commands =
                 pos.Line
                 tyRes.GetParseResults.ParseTree
                 maybeUnresolvedIdents
-                OpenStatementInsertionPoint.Nearest
+                openNamespacePreference
 
             let word = sym.Text
 

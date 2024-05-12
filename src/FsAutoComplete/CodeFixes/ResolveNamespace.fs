@@ -39,6 +39,7 @@ let fix
     ParseAndCheckResults
       -> FcsPos
       -> LineText
+      -> OpenStatementInsertionPoint
       -> Async<CoreResponse<string * list<string * string * InsertionContext * bool> * list<string * string>>>)
   (openNamespacePreference: OpenStatementInsertionPoint)
   =
@@ -81,8 +82,6 @@ let fix
         Title = insertion.DisplayText
         Kind = FixKind.Fix }
 
-      // OpenNamespace.insertNearest ns "" ast pos
-
   Run.ifDiagnosticByCheckMessage undefinedName (fun diagnostic codeActionParameter ->
     asyncResult {
       let pos = protocolPosToPos diagnostic.Range.Start
@@ -91,7 +90,7 @@ let fix
 
       let! tyRes, line, lines = getParseResultsForFile filePath pos
 
-      match! getNamespaceSuggestions tyRes pos line with
+      match! getNamespaceSuggestions tyRes pos line openNamespacePreference with
       | CoreResponse.InfoRes _msg
       | CoreResponse.ErrorRes _msg -> return []
       | CoreResponse.Res(word, opens, qualifiers) ->
@@ -102,6 +101,7 @@ let fix
         let ops =
           opens
           |> List.map (openFix lines codeActionParameter.TextDocument diagnostic word tyRes.GetAST pos)
+          // |> List.map (openFix lines codeActionParameter.TextDocument diagnostic word)
 
         return [ yield! ops; yield! quals ]
     })

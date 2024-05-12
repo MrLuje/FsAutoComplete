@@ -18,6 +18,7 @@ val fix:
     (ParseAndCheckResults
       -> FcsPos
       -> LineText
+      -> OpenStatementInsertionPoint
       -> Async<CoreResponse<string * list<string * string * InsertionContext * bool> * list<string * string>>>) ->
   openNamespacePreference: OpenStatementInsertionPoint ->
     (CodeActionParams -> Async<Result<Fix list, string>>)
