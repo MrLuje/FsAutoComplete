@@ -91,13 +91,16 @@ module OpenNamespace =
     | Nearest
     | Top
 
-  let private adjustInsertionPoint (lines: ISourceText) (ctx: InsertionContext) =
+  let private detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
+
+
+  let private adjustInsertionPoint (getLine: int -> string) (ctx: InsertionContext) =
     let l = ctx.Pos.Line
 
     let retVal =
       match ctx.ScopeKind with
       | ScopeKind.TopModule when l > 1 ->
-        let line = lines.GetLineString(l - 2)
+        let line = getLine(ctx.Pos.Line - 2)
 
         let isImplicitTopLevelModule =
           not (
@@ -108,56 +111,49 @@ module OpenNamespace =
         if isImplicitTopLevelModule then 1 else l
       | ScopeKind.TopModule -> 1
       | ScopeKind.Namespace ->
-        let mostRecentNamespaceInScope =
-          let lineNos = if l = 0 then [] else [ 0 .. l - 1 ]
+          // for namespace `open` isn't created close at namespace,
+          // but instead on first member
+          // -> move `open` closer to namespace
+          // this only happens when there are no other `open`
 
-          lineNos
-          |> List.mapi (fun i line -> i, lines.GetLineString line)
-          |> List.choose (fun (i, lineStr) ->
-            if lineStr.StartsWith("namespace", StringComparison.Ordinal) then
-              Some i
-            else
-              None)
-          |> List.tryLast
-
-        match mostRecentNamespaceInScope with
-        // move to the next line below "namespace" and convert it to F# 1-based line number
-        | Some line -> line + 2
-        | None -> l
+          // from insert position go up until first open OR namespace
+          ctx.Pos.IncLine().LinesToBeginning()
+          |> Seq.tryFind (fun pos ->
+            let lineStr = getLine pos.Line
+            // namespace MUST be top level -> no indentation
+            lineStr.StartsWith("namespace ", StringComparison.Ordinal))
+          |> function
+            // move to the next line below "namespace"
+            | Some pos -> pos.IncLine().Line
+            | None -> ctx.Pos.Line
       | _ -> l
 
     let containsAttribute (x: string) = x.Contains "[<"
-    let currentLine = System.Math.Max(retVal - 2, 0) |> lines.GetLineString
+    let currentLine = System.Math.Max(retVal - 2, 0) |> getLine
 
-    if currentLine |> containsAttribute then
-      retVal + 1
-    else
-      retVal
+    let retLine = if currentLine |> containsAttribute then retVal + 1 else retVal
+    retLine
 
   let insertAtTop
     (text: ISourceText)
-    (name: string)
+    (actualOpen: string)
     (ns: string)
-    (word: string)
     (ctx: InsertionContext)
    =
-    // let insertionContext =
-    //   ParsedInput.FindNearestPointToInsertOpenDeclaration (pos.Line) ast idents OpenStatementInsertionPoint.TopLevel
-
     // HACK: This is a work around for inheriting the correct column of the current module
     // It seems the column we get from FCS is incorrect
-    // let docLine = insertionContext.Pos.Line// - 1
 
-    let insertPoint = adjustInsertionPoint text ctx
-    let docLine = insertPoint - 1
+    let insertPoint = adjustInsertionPoint (text.GetLineString) ctx
+    let docLine = insertPoint
+    // let docLine = ctx.Pos.Line - 2
 
-    let actualOpen =
-      if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
-        let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
+    // let actualOpen =
+    //   if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
+    //     let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
 
-        $"%s{ns}.%s{prefix}"
-      else
-        ns
+    //     $"%s{ns}.%s{prefix}"
+    //   else
+    //     ns
  
     let openText = $"open %s{actualOpen}"
 
@@ -189,68 +185,51 @@ module OpenNamespace =
       InsertText = lineStr
       ScopeKind = None }
 
-  let insertNearest 
+  let insertNearest
     (ns: string)
     (fullName: string)
     (ast: FSharp.Compiler.Syntax.ParsedInput)
-    (pos: Position)
+    (line: int)
     (getLine: pos -> string) =
       let idents = fullName.Split '.'
-      let ic = ParsedInput.FindNearestPointToInsertOpenDeclaration (pos.Line) ast idents OpenStatementInsertionPoint.Nearest
-      
+      let ic = ParsedInput.FindNearestPointToInsertOpenDeclaration line ast idents OpenStatementInsertionPoint.Nearest
+      let insertPoint = adjustInsertionPoint (fun l -> getLine (Position.mkPos l 0)) ic
+      let insertPos = Position.mkPos insertPoint 0
+
       //TODO: unite with `CodeFix/ResolveNamespace`
       //TODO: Handle Nearest AND TopLevel. Currently it's just Nearest (vs. ResolveNamespace -> TopLevel) (#789)
-
-      let detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
-
-      // adjust line
-      let pos =
-        match ic.ScopeKind with
-        | ScopeKind.Namespace ->
-          // for namespace `open` isn't created close at namespace,
-          // but instead on first member
-          // -> move `open` closer to namespace
-          // this only happens when there are no other `open`
-
-          // from insert position go up until first open OR namespace
-          ic.Pos.IncLine().LinesToBeginning()
-          |> Seq.tryFind (fun l ->
-            let lineStr = getLine l
-            // namespace MUST be top level -> no indentation
-            lineStr.StartsWith("namespace ", StringComparison.Ordinal))
-          |> function
-            // move to the next line below "namespace"
-            | Some l -> l.IncLine()
-            | None -> ic.Pos
-        | _ -> ic.Pos
-
       // adjust column
       let pos =
-        match pos with
-        | Pos(1, _) -> pos
+        match insertPos with
+        | Pos(1, _) -> insertPos
         | Pos(l, 0) ->
-          let prev = getLine (pos.DecLine())
+          let prev = getLine (insertPos.DecLine())
           let indentation = detectIndentation prev
 
           if indentation <> 0 then
             // happens when there are already other `open`s
             Position.mkPos l indentation
           else
-            pos
-        | Pos(_, _) -> pos
+            insertPos
+        | Pos(_, _) -> insertPos
+
+      let whitespaces = String.replicate (pos.Column) " "
+      let actualOpen = $"open %s{ns}\n"
+      let openText = $"%s{whitespaces}%s{actualOpen}"
 
       { Namespace = ns
-        Line = pos.Line
-        Column = pos.Column
-        DisplayText = ""
-        InsertText = ""
+        Line = pos.Line - 1 // adjust to 1 index-based
+        Column = 0
+        DisplayText = actualOpen
+        InsertText = openText
         ScopeKind = Some ic.ScopeKind }
 
   let insertNamespace
     (text: ISourceText)
-    (name: string)
+    // (name: string)
+    // (word: string)
+    (actualOpen: string)
     (ns: string)
-    (word: string)
     (ctx: InsertionContext)
     (fullName: string)
     (ast: FSharp.Compiler.Syntax.ParsedInput)
@@ -259,8 +238,8 @@ module OpenNamespace =
     (openNamespacePreference: OpenStatementInsertionPoint) 
     =
     match openNamespacePreference with
-    | OpenStatementInsertionPoint.TopLevel -> insertAtTop text name ns word ctx
-    | OpenStatementInsertionPoint.Nearest -> insertNearest ns fullName ast pos getLine
+    | OpenStatementInsertionPoint.TopLevel -> insertAtTop text actualOpen ns ctx
+    | OpenStatementInsertionPoint.Nearest -> insertNearest ns fullName ast pos.Line getLine
 
 module Commands =
   open System.Collections.Concurrent
@@ -856,7 +835,7 @@ module Commands =
     option {
       let! n = decl.NamespaceToOpen
       let! ast = (currentAst())
-      let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos getLine
+      let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos.Line getLine
       let! scopeKind = insertion.ScopeKind
       return
         { Namespace = insertion.Namespace

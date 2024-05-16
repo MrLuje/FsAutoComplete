@@ -45,10 +45,10 @@ let fix
   =
 
   /// insert a line of text at a given line
-  let insertLine line lineStr =
+  let insertLine line col lineStr =
     { Range =
-        { Start = { Line = line; Character = 0 }
-          End = { Line = line; Character = 0 } }
+        { Start = { Line = line; Character = col }
+          End = { Line = line; Character = col } }
       NewText = lineStr }
 
   let qualifierFix file diagnostic qual =
@@ -71,10 +71,27 @@ let fix
     : Fix =
     
     match openNamespacePreference with
-    | OpenStatementInsertionPoint.Nearest
+    | OpenStatementInsertionPoint.Nearest ->
+      let insertion = OpenNamespace.insertNearest ns ns _ast _pos.Line (fun p -> text.GetLineString (Conversions.fcsPosToLsp p).Line)
+      let edits = [| yield insertLine (insertion.Line) (insertion.Column) (insertion.InsertText) |]
+
+      { Edits = edits
+        File = file
+        SourceDiagnostic = Some diagnostic
+        Title = insertion.DisplayText
+        Kind = FixKind.Fix }
+
     | OpenStatementInsertionPoint.TopLevel -> 
-      let insertion = OpenNamespace.insertAtTop text name ns word ctx 
-      let edits = [| yield insertLine (insertion.Line) (insertion.InsertText) |]
+      let actualOpen =
+        if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
+          let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
+
+          $"%s{ns}.%s{prefix}"
+        else
+          ns
+
+      let insertion = OpenNamespace.insertAtTop text actualOpen ns ctx 
+      let edits = [| yield insertLine (insertion.Line) 0 (insertion.InsertText) |]
 
       { Edits = edits
         File = file

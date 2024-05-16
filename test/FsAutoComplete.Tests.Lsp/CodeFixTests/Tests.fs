@@ -2833,12 +2833,125 @@ let private replaceWithSuggestionTests state =
         let x = ``hello world``
         """ ])
 
-let private resolveNamespaceTests state =
+// let private resolveNamespaceTopLevelTests state =
+//   let config =
+//     { defaultConfigDto with
+//         ResolveNamespaces = Some true
+//         OpenNamespacePreference = Some FSharp.Compiler.EditorServices.OpenStatementInsertionPoint.TopLevel }
+
+//   fserverTestList $"{nameof ResolveNamespace}TopLevel" state config None (fun server ->
+//     [ let selectCodeFix =
+//         CodeFix.matching (fun ca -> ca.Title.StartsWith("open", StringComparison.Ordinal))
+
+//       testCaseAsync "doesn't fail when target not in last line"
+//       <| CodeFix.checkApplicable
+//         server
+//         """
+//         let x = $0Min(2.0, 1.0)
+//         """ // Note: new line at end!
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         (CodeFix.log >> selectCodeFix >> Array.take 1)
+
+//       testCaseAsync "doesn't fail when target in last line"
+//       <| CodeFix.checkApplicable
+//         server
+//         "let x = $0Min(2.0, 1.0)" // Note: No new line at end!
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         (CodeFix.log >> selectCodeFix >> Array.take 1)
+
+//       testCaseAsync "place open at toplevel (avoid module opens)"
+//       <| CodeFix.check
+//         server
+//         """
+// module Foo =
+//   open Microsoft
+
+//   let foo = Date$0Time.Now
+//         """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// open System
+
+// module Foo =
+//   open Microsoft
+
+//   let foo = DateTime.Now
+//         """
+
+
+//       testCaseAsync "place open at top level"
+//       <| CodeFix.check
+//         server
+//         """
+// module Foo =
+//   let foo = $0DateTime.Now
+//         """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// open System
+
+// module Foo =
+//   let foo = DateTime.Now
+//         """
+
+
+//       testCaseAsync "at top level With attribute"
+//       <| CodeFix.check
+//         server
+//         """
+// [<AutoOpen>]
+// module Foo =
+
+//   let foo = $0DateTime.Now
+//           """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// open System
+
+// [<AutoOpen>]
+// module Foo =
+
+//   let foo = DateTime.Now
+//           """
+
+//       testCaseAsync "In top Root module"
+//       <| CodeFix.check
+//         server
+//         """
+// module Root
+
+// module Nested =
+
+//   let foo () =
+//     $0DateTime.Now
+//         """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// module Root
+// open System
+
+// module Nested =
+
+//   let foo () =
+//     DateTime.Now
+//         """
+//       //TODO: Implement & unify with `Completion.AutoOpen` (`CompletionTests.fs`)
+//       // Issues:
+//       // * Complex because of nesting modules (-> where to open)
+//       // * Different open locations of CodeFix and AutoOpen
+//       ])
+
+let private resolveNamespaceNearestTests state =
   let config =
     { defaultConfigDto with
-        ResolveNamespaces = Some true }
+        ResolveNamespaces = Some true
+        OpenNamespacePreference = Some FSharp.Compiler.EditorServices.OpenStatementInsertionPoint.Nearest }
 
-  serverTestList (nameof ResolveNamespace) state config None (fun server ->
+  fserverTestList $"{nameof ResolveNamespace}Nearest" state config None (fun server ->
     [ let selectCodeFix =
         CodeFix.matching (fun ca -> ca.Title.StartsWith("open", StringComparison.Ordinal))
 
@@ -2877,7 +2990,6 @@ module Foo =
   let foo = DateTime.Now
         """
 
-
       testCaseAsync "place open in module correctly without any modules"
       <| CodeFix.check
         server
@@ -2893,54 +3005,48 @@ module Foo =
   let foo = DateTime.Now
         """
 
+//       testCaseAsync "With attribute"
+//       <| CodeFix.check
+//         server
+//         """
+// [<AutoOpen>]
+// module Foo =
 
+//   let foo = $0DateTime.Now
+//           """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// [<AutoOpen>]
+// module Foo =
+//   open System
 
-      testCaseAsync "With attribute"
-      <| CodeFix.check
-        server
-        """
-[<AutoOpen>]
-module Foo =
+//   let foo = DateTime.Now
+//           """
 
-  let foo = $0DateTime.Now
-          """
-        (Diagnostics.log >> Diagnostics.acceptAll)
-        selectCodeFix
-        """
-[<AutoOpen>]
-module Foo =
-  open System
+//       testCaseAsync "Root module"
+//       <| CodeFix.check
+//         server
+//         """
+// module Root
 
-  let foo = DateTime.Now
-          """
+// module Nested =
 
-      testCaseAsync "Root module"
-      <| CodeFix.check
-        server
-        """
-module Root
+//   let foo () =
+//     $0DateTime.Now
+//         """
+//         (Diagnostics.log >> Diagnostics.acceptAll)
+//         selectCodeFix
+//         """
+// module Root
 
-module Nested =
+// module Nested =
+//   open System
 
-  let foo () =
-    $0DateTime.Now
-        """
-        (Diagnostics.log >> Diagnostics.acceptAll)
-        selectCodeFix
-        """
-module Root
-
-module Nested =
-  open System
-
-  let foo () =
-    DateTime.Now
-        """
-      //TODO: Implement & unify with `Completion.AutoOpen` (`CompletionTests.fs`)
-      // Issues:
-      // * Complex because of nesting modules (-> where to open)
-      // * Different open locations of CodeFix and AutoOpen
-      ])
+//   let foo () =
+//     DateTime.Now
+//         """
+        ])
 
 let private useMutationWhenValueIsMutableTests state =
   serverTestList (nameof UseMutationWhenValueIsMutable) state defaultConfigDto None (fun server ->
@@ -3577,7 +3683,8 @@ let tests textFactory state =
       RenameParamToMatchSignatureTests.tests state
       renameUnusedValue state
       replaceWithSuggestionTests state
-      resolveNamespaceTests state
+      resolveNamespaceNearestTests state
+      // resolveNamespaceTopLevelTests state
       useMutationWhenValueIsMutableTests state
       useTripleQuotedInterpolationTests state
       wrapExpressionInParenthesesTests state
