@@ -3005,47 +3005,47 @@ module Foo =
   let foo = DateTime.Now
         """
 
-//       testCaseAsync "With attribute"
-//       <| CodeFix.check
-//         server
-//         """
-// [<AutoOpen>]
-// module Foo =
+      testCaseAsync "With attribute"
+      <| CodeFix.check
+        server
+        """
+[<AutoOpen>]
+module Foo =
 
-//   let foo = $0DateTime.Now
-//           """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// [<AutoOpen>]
-// module Foo =
-//   open System
+  let foo = $0DateTime.Now
+          """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+[<AutoOpen>]
+module Foo =
+  open System
 
-//   let foo = DateTime.Now
-//           """
+  let foo = DateTime.Now
+          """
 
-//       testCaseAsync "Root module"
-//       <| CodeFix.check
-//         server
-//         """
-// module Root
+      testCaseAsync "Root module"
+      <| CodeFix.check
+        server
+        """
+module Root
 
-// module Nested =
+module Nested =
 
-//   let foo () =
-//     $0DateTime.Now
-//         """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// module Root
+  let foo () =
+    $0DateTime.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+module Root
 
-// module Nested =
-//   open System
+module Nested =
+  open System
 
-//   let foo () =
-//     DateTime.Now
-//         """
+  let foo () =
+    DateTime.Now
+        """
         ])
 
 let private useMutationWhenValueIsMutableTests state =

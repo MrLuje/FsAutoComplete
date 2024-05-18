@@ -72,7 +72,10 @@ let fix
     
     match openNamespacePreference with
     | OpenStatementInsertionPoint.Nearest ->
-      let insertion = OpenNamespace.insertNearest ns ns _ast _pos.Line (fun p -> text.GetLineString (Conversions.fcsPosToLsp p).Line)
+      let getLine = (fun p ->
+        let lspLine = (Conversions.fcsPosToLsp p).Line
+        if lspLine < 0 then None else text.GetLineString lspLine |> Some)
+      let insertion = OpenNamespace.insertNearest ns ns _ast _pos.Line getLine
       let edits = [| yield insertLine (insertion.Line) (insertion.Column) (insertion.InsertText) |]
 
       { Edits = edits

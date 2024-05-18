@@ -94,8 +94,9 @@ module OpenNamespace =
   let private detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
 
 
-  let private adjustInsertionPoint (getLine: int -> string) (ctx: InsertionContext) =
+  let private adjustInsertionPoint (getLine: int -> string option) (ctx: InsertionContext) =
     let l = ctx.Pos.Line
+    let getLine (p: int) = getLine p |> Option.defaultValue ""
 
     let retVal =
       match ctx.ScopeKind with
@@ -126,10 +127,26 @@ module OpenNamespace =
             // move to the next line below "namespace"
             | Some pos -> pos.IncLine().Line
             | None -> ctx.Pos.Line
+      // | ScopeKind.OpenDeclaration
+      // | ScopeKind.NestedModule ->
+      //     // from insert position go up until first open OR namespace
+      //     ctx.Pos.LinesToBeginning()
+      //     |> Seq.tryFind (fun pos ->
+      //       let lineStr = getLine pos.Line
+      //       // namespace MUST be top level -> no indentation
+      //       lineStr.StartsWith("module ", StringComparison.Ordinal))
+      //     |> function
+      //       // move to the next line below "namespace"
+      //       | Some pos -> pos.IncLine().Line
+      //       | None -> ctx.Pos.Line
       | _ -> l
 
     let containsAttribute (x: string) = x.Contains "[<"
-    let currentLine = System.Math.Max(retVal - 2, 0) |> getLine
+    let currentLine = 
+      [ 2 .. -1 .. 0 ] 
+      |> List.map(fun i -> retVal - i |> getLine) 
+      |> List.tryPick(fun l -> if l = "" then None else Some l)
+      |> Option.defaultValue ""
 
     let retLine = if currentLine |> containsAttribute then retVal + 1 else retVal
     retLine
@@ -143,7 +160,8 @@ module OpenNamespace =
     // HACK: This is a work around for inheriting the correct column of the current module
     // It seems the column we get from FCS is incorrect
 
-    let insertPoint = adjustInsertionPoint (text.GetLineString) ctx
+    let getLine p = if p < 0 then None else text.GetLineString p |> Some
+    let insertPoint = adjustInsertionPoint getLine ctx
     let docLine = insertPoint
     // let docLine = ctx.Pos.Line - 2
 
@@ -190,11 +208,12 @@ module OpenNamespace =
     (fullName: string)
     (ast: FSharp.Compiler.Syntax.ParsedInput)
     (line: int)
-    (getLine: pos -> string) =
+    (getLine: pos -> string option) =
       let idents = fullName.Split '.'
       let ic = ParsedInput.FindNearestPointToInsertOpenDeclaration line ast idents OpenStatementInsertionPoint.Nearest
       let insertPoint = adjustInsertionPoint (fun l -> getLine (Position.mkPos l 0)) ic
       let insertPos = Position.mkPos insertPoint 0
+      let getLine p = getLine p |> Option.defaultValue ""
 
       //TODO: unite with `CodeFix/ResolveNamespace`
       //TODO: Handle Nearest AND TopLevel. Currently it's just Nearest (vs. ResolveNamespace -> TopLevel) (#789)
@@ -204,13 +223,15 @@ module OpenNamespace =
         | Pos(1, _) -> insertPos
         | Pos(l, 0) ->
           let prev = getLine (insertPos.DecLine())
-          let indentation = detectIndentation prev
-
-          if indentation <> 0 then
-            // happens when there are already other `open`s
-            Position.mkPos l indentation
+          if prev.StartsWith("namespace ", StringComparison.Ordinal) || prev.StartsWith("module ", StringComparison.Ordinal) then Position.mkPos l ic.Pos.Column
           else
-            insertPos
+            let indentation = detectIndentation prev
+
+            if indentation <> 0 then
+              // happens when there are already other `open`s
+              Position.mkPos l indentation
+            else
+              insertPos
         | Pos(_, _) -> insertPos
 
       let whitespaces = String.replicate (pos.Column) " "
@@ -234,7 +255,7 @@ module OpenNamespace =
     (fullName: string)
     (ast: FSharp.Compiler.Syntax.ParsedInput)
     (pos: Position)
-    (getLine: pos -> string)
+    (getLine: pos -> string option)
     (openNamespacePreference: OpenStatementInsertionPoint) 
     =
     match openNamespacePreference with
@@ -830,7 +851,7 @@ module Commands =
     (pos: Position)
     getLine
     : CompletionNamespaceInsert option =
-    let getLine (p: Position) = getLine p |> Option.defaultValue ""
+    // let getLine (p: Position) = getLine p |> Option.defaultValue ""
 
     option {
       let! n = decl.NamespaceToOpen
