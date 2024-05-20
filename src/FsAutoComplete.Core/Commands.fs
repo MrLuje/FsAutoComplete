@@ -93,8 +93,26 @@ module OpenNamespace =
 
   let private detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
 
+  /// <summary>
+  ///   Going up from position, find the first line that match the statement and set the position below it. 
+  ///   if not found returns the current pos
+  /// </summary>
+  /// <param name="getLine"></param>
+  /// <param name="statement"></param>
+  /// <param name="pos"></param>
+  /// <returns></returns>
+  let private findLineBelowStatement (getLine: int -> string ) (statement: string) (pos: pos) =
+    pos.IncLine().LinesToBeginning()
+    |> Seq.tryFind (fun pos ->
+      let lineStr = getLine pos.Line
+      // namespace MUST be top level -> no indentation
+      lineStr.StartsWith(statement, StringComparison.Ordinal))
+    |> function
+      // move to the next line below "namespace"
+      | Some pos -> pos.IncLine().Line
+      | None -> pos.Line
 
-  let private adjustInsertionPoint (getLine: int -> string option) (ctx: InsertionContext) =
+  let private adjustInsertionPoint (getLine: int -> string option) (ctx: InsertionContext) (openStatementInsertionPoint: OpenStatementInsertionPoint)=
     let l = ctx.Pos.Line
     let getLine (p: int) = getLine p |> Option.defaultValue ""
 
@@ -109,7 +127,7 @@ module OpenNamespace =
             && not (line.EndsWith("=", StringComparison.Ordinal))
           )
 
-        if isImplicitTopLevelModule then 1 else l
+        if isImplicitTopLevelModule then 0 else l
       | ScopeKind.TopModule -> 1
       | ScopeKind.Namespace ->
           // for namespace `open` isn't created close at namespace,
@@ -118,38 +136,23 @@ module OpenNamespace =
           // this only happens when there are no other `open`
 
           // from insert position go up until first open OR namespace
-          ctx.Pos.IncLine().LinesToBeginning()
-          |> Seq.tryFind (fun pos ->
-            let lineStr = getLine pos.Line
-            // namespace MUST be top level -> no indentation
-            lineStr.StartsWith("namespace ", StringComparison.Ordinal))
-          |> function
-            // move to the next line below "namespace"
-            | Some pos -> pos.IncLine().Line
-            | None -> ctx.Pos.Line
-      // | ScopeKind.OpenDeclaration
-      // | ScopeKind.NestedModule ->
-      //     // from insert position go up until first open OR namespace
-      //     ctx.Pos.LinesToBeginning()
-      //     |> Seq.tryFind (fun pos ->
-      //       let lineStr = getLine pos.Line
-      //       // namespace MUST be top level -> no indentation
-      //       lineStr.StartsWith("module ", StringComparison.Ordinal))
-      //     |> function
-      //       // move to the next line below "namespace"
-      //       | Some pos -> pos.IncLine().Line
-      //       | None -> ctx.Pos.Line
+          findLineBelowStatement getLine "namespace " ctx.Pos
       | _ -> l
 
+    // ensure adjacent to previous opens
+    let retVal = findLineBelowStatement getLine "open " (Position.mkPos retVal 0)
+
     let containsAttribute (x: string) = x.Contains "[<"
-    let currentLine = 
-      [ 2 .. -1 .. 0 ] 
-      |> List.map(fun i -> retVal - i |> getLine) 
+    let currentLine =
+      [ 2 .. -1 .. 0 ]
+      |> List.map(fun i -> retVal - i |> getLine)
       |> List.tryPick(fun l -> if l = "" then None else Some l)
       |> Option.defaultValue ""
 
-    let retLine = if currentLine |> containsAttribute then retVal + 1 else retVal
-    retLine
+    match currentLine |> containsAttribute, openStatementInsertionPoint with
+    | true, OpenStatementInsertionPoint.Nearest -> retVal + 1
+    | true, OpenStatementInsertionPoint.TopLevel -> retVal
+    | false, _ -> retVal
 
   let insertAtTop
     (text: ISourceText)
@@ -157,21 +160,9 @@ module OpenNamespace =
     (ns: string)
     (ctx: InsertionContext)
    =
-    // HACK: This is a work around for inheriting the correct column of the current module
-    // It seems the column we get from FCS is incorrect
-
     let getLine p = if p < 0 then None else text.GetLineString p |> Some
-    let insertPoint = adjustInsertionPoint getLine ctx
+    let insertPoint = adjustInsertionPoint getLine ctx OpenStatementInsertionPoint.TopLevel
     let docLine = insertPoint
-    // let docLine = ctx.Pos.Line - 2
-
-    // let actualOpen =
-    //   if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
-    //     let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
-
-    //     $"%s{ns}.%s{prefix}"
-    //   else
-    //     ns
  
     let openText = $"open %s{actualOpen}"
 
@@ -186,15 +177,18 @@ module OpenNamespace =
           let theThereAreOtherOpensInThisModule () = text.GetLineString(previousLine).Contains "open "
 
           if insertionPointIsNotOutOfBoundsOfTheFile && theThereAreOtherOpensInThisModule () then
-            text.GetLineString(previousLine).Split("open") |> Seq.head |> Seq.length // inherit the previous opens whitespace
+            text.GetLineString(previousLine) |> detectIndentation
           else
             ctx.Pos.Column
 
-        // let column = insertionContext.Pos.Column
-
         String.replicate column " "
 
-      $"%s{whitespace}%s{openText}\n"
+      // Ensure a linebreak between open and next statement
+      let lineBreaks =
+        if text.GetLineString(docLine).Trim() |> String.IsNullOrEmpty then "\n" else $"\n\n"
+
+      $"%s{whitespace}%s{openText}%s{lineBreaks}"
+
 
     { Namespace = ns
       Line = docLine
@@ -211,7 +205,7 @@ module OpenNamespace =
     (getLine: pos -> string option) =
       let idents = fullName.Split '.'
       let ic = ParsedInput.FindNearestPointToInsertOpenDeclaration line ast idents OpenStatementInsertionPoint.Nearest
-      let insertPoint = adjustInsertionPoint (fun l -> getLine (Position.mkPos l 0)) ic
+      let insertPoint = adjustInsertionPoint (fun l -> getLine (Position.mkPos l 0)) ic OpenStatementInsertionPoint.Nearest
       let insertPos = Position.mkPos insertPoint 0
       let getLine p = getLine p |> Option.defaultValue ""
 

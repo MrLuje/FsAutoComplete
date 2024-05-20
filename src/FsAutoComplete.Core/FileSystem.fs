@@ -47,7 +47,7 @@ module PositionExtensions =
         Seq.empty
       else
         seq {
-          for i = x.Line - 1 downto 1 do
+          for i = x.Line - 1 downto 0 do
             yield Position.mkPos i 0
         }
 

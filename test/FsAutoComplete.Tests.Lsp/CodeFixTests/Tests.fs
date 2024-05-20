@@ -2833,117 +2833,138 @@ let private replaceWithSuggestionTests state =
         let x = ``hello world``
         """ ])
 
-// let private resolveNamespaceTopLevelTests state =
-//   let config =
-//     { defaultConfigDto with
-//         ResolveNamespaces = Some true
-//         OpenNamespacePreference = Some FSharp.Compiler.EditorServices.OpenStatementInsertionPoint.TopLevel }
+let private resolveNamespaceTopLevelTests state =
+  let config =
+    { defaultConfigDto with
+        ResolveNamespaces = Some true
+        OpenNamespacePreference = Some FSharp.Compiler.EditorServices.OpenStatementInsertionPoint.TopLevel }
 
-//   fserverTestList $"{nameof ResolveNamespace}TopLevel" state config None (fun server ->
-//     [ let selectCodeFix =
-//         CodeFix.matching (fun ca -> ca.Title.StartsWith("open", StringComparison.Ordinal))
+  fserverTestList $"{nameof ResolveNamespace}TopLevel" state config None (fun server ->
+    [ let selectCodeFix =
+        CodeFix.matching (fun ca -> ca.Title.StartsWith("open", StringComparison.Ordinal))
 
-//       testCaseAsync "doesn't fail when target not in last line"
-//       <| CodeFix.checkApplicable
-//         server
-//         """
-//         let x = $0Min(2.0, 1.0)
-//         """ // Note: new line at end!
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         (CodeFix.log >> selectCodeFix >> Array.take 1)
+      testCaseAsync "doesn't fail when target not in last line"
+      <| CodeFix.checkApplicable
+        server
+        """
+        let x = $0Min(2.0, 1.0)
+        """ // Note: new line at end!
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        (CodeFix.log >> selectCodeFix >> Array.take 1)
 
-//       testCaseAsync "doesn't fail when target in last line"
-//       <| CodeFix.checkApplicable
-//         server
-//         "let x = $0Min(2.0, 1.0)" // Note: No new line at end!
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         (CodeFix.log >> selectCodeFix >> Array.take 1)
+      testCaseAsync "doesn't fail when target in last line"
+      <| CodeFix.checkApplicable
+        server
+        "let x = $0Min(2.0, 1.0)" // Note: No new line at end!
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        (CodeFix.log >> selectCodeFix >> Array.take 1)
 
-//       testCaseAsync "place open at toplevel (avoid module opens)"
-//       <| CodeFix.check
-//         server
-//         """
-// module Foo =
-//   open Microsoft
+      testCaseAsync "place open at toplevel (avoid module opens)"
+      <| CodeFix.check
+        server
+        """
+module Foo =
+  open Microsoft
 
-//   let foo = Date$0Time.Now
-//         """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// open System
+  let foo = Date$0Time.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+open System
 
-// module Foo =
-//   open Microsoft
+module Foo =
+  open Microsoft
 
-//   let foo = DateTime.Now
-//         """
-
-
-//       testCaseAsync "place open at top level"
-//       <| CodeFix.check
-//         server
-//         """
-// module Foo =
-//   let foo = $0DateTime.Now
-//         """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// open System
-
-// module Foo =
-//   let foo = DateTime.Now
-//         """
+  let foo = DateTime.Now
+        """
 
 
-//       testCaseAsync "at top level With attribute"
-//       <| CodeFix.check
-//         server
-//         """
-// [<AutoOpen>]
-// module Foo =
+      testCaseAsync "place open at top level"
+      <| CodeFix.check
+        server
+        """
+module Foo =
+  let foo = $0DateTime.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+open System
 
-//   let foo = $0DateTime.Now
-//           """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// open System
+module Foo =
+  let foo = DateTime.Now
+        """
 
-// [<AutoOpen>]
-// module Foo =
 
-//   let foo = DateTime.Now
-//           """
+      testCaseAsync "place open at top level with other opens"
+      <| CodeFix.check
+        server
+        """
+open System.Text
 
-//       testCaseAsync "In top Root module"
-//       <| CodeFix.check
-//         server
-//         """
-// module Root
+module Foo =
+  let foo = $0DateTime.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+open System.Text
+open System
 
-// module Nested =
+module Foo =
+  let foo = DateTime.Now
+        """
 
-//   let foo () =
-//     $0DateTime.Now
-//         """
-//         (Diagnostics.log >> Diagnostics.acceptAll)
-//         selectCodeFix
-//         """
-// module Root
-// open System
 
-// module Nested =
+      testCaseAsync "at top level With attribute"
+      <| CodeFix.check
+        server
+        """
+[<AutoOpen>]
+module Foo =
 
-//   let foo () =
-//     DateTime.Now
-//         """
-//       //TODO: Implement & unify with `Completion.AutoOpen` (`CompletionTests.fs`)
-//       // Issues:
-//       // * Complex because of nesting modules (-> where to open)
-//       // * Different open locations of CodeFix and AutoOpen
-//       ])
+  let foo = $0DateTime.Now
+          """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+open System
+
+[<AutoOpen>]
+module Foo =
+
+  let foo = DateTime.Now
+          """
+
+      testCaseAsync "In top Root module"
+      <| CodeFix.check
+        server
+        """
+module Root
+
+module Nested =
+
+  let foo () =
+    $0DateTime.Now
+        """
+        (Diagnostics.log >> Diagnostics.acceptAll)
+        selectCodeFix
+        """
+module Root
+
+open System
+
+module Nested =
+
+  let foo () =
+    DateTime.Now
+        """
+      //TODO: Implement & unify with `Completion.AutoOpen` (`CompletionTests.fs`)
+      // Issues:
+      // * Complex because of nesting modules (-> where to open)
+      // * Different open locations of CodeFix and AutoOpen
+      ])
 
 let private resolveNamespaceNearestTests state =
   let config =
@@ -3684,7 +3705,7 @@ let tests textFactory state =
       renameUnusedValue state
       replaceWithSuggestionTests state
       resolveNamespaceNearestTests state
-      // resolveNamespaceTopLevelTests state
+      resolveNamespaceTopLevelTests state
       useMutationWhenValueIsMutableTests state
       useTripleQuotedInterpolationTests state
       wrapExpressionInParenthesesTests state
