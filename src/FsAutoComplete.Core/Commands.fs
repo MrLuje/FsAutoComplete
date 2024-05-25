@@ -93,22 +93,14 @@ module OpenNamespace =
 
   let private detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
 
-  /// <summary>
-  ///   Going up from position, find the first line that match the statement and set the position below it. 
-  ///   if not found returns the current pos
-  /// </summary>
-  /// <param name="getLine"></param>
-  /// <param name="statement"></param>
-  /// <param name="pos"></param>
-  /// <returns></returns>
+  /// Going up from position, find the first line that match the statement and set the position below it. 
+  /// if not found returns the current pos
   let private findLineBelowStatement (getLine: int -> string ) (statement: string) (pos: pos) =
-    pos.IncLine().LinesToBeginning()
+    pos.LinesToBeginning()
     |> Seq.tryFind (fun pos ->
       let lineStr = getLine pos.Line
-      // namespace MUST be top level -> no indentation
       lineStr.StartsWith(statement, StringComparison.Ordinal))
     |> function
-      // move to the next line below "namespace"
       | Some pos -> pos.IncLine().Line
       | None -> pos.Line
 
@@ -117,8 +109,8 @@ module OpenNamespace =
     let getLine (p: int) = getLine p |> Option.defaultValue ""
 
     let retVal =
-      match ctx.ScopeKind with
-      | ScopeKind.TopModule when l > 1 ->
+      match openStatementInsertionPoint, ctx.ScopeKind with
+      | OpenStatementInsertionPoint.TopLevel, ScopeKind.TopModule when l > 1 ->
         let line = getLine(ctx.Pos.Line - 2)
 
         let isImplicitTopLevelModule =
@@ -128,14 +120,9 @@ module OpenNamespace =
           )
 
         if isImplicitTopLevelModule then 0 else l
-      | ScopeKind.TopModule -> 1
-      | ScopeKind.Namespace ->
-          // for namespace `open` isn't created close at namespace,
-          // but instead on first member
-          // -> move `open` closer to namespace
-          // this only happens when there are no other `open`
-
-          // from insert position go up until first open OR namespace
+      | OpenStatementInsertionPoint.TopLevel, ScopeKind.TopModule -> 1
+      | _, ScopeKind.Namespace ->
+          // from insert position go up until namespace
           findLineBelowStatement getLine "namespace " ctx.Pos
       | _ -> l
 
@@ -217,7 +204,7 @@ module OpenNamespace =
         | Pos(1, _) -> insertPos
         | Pos(l, 0) ->
           let prev = getLine (insertPos.DecLine())
-          if prev.StartsWith("namespace ", StringComparison.Ordinal) || prev.StartsWith("module ", StringComparison.Ordinal) then Position.mkPos l ic.Pos.Column
+          if prev.Contains("namespace ", StringComparison.Ordinal) || prev.Contains("module ", StringComparison.Ordinal) then Position.mkPos l ic.Pos.Column
           else
             let indentation = detectIndentation prev
 
@@ -233,8 +220,8 @@ module OpenNamespace =
       let openText = $"%s{whitespaces}%s{actualOpen}"
 
       { Namespace = ns
-        Line = pos.Line - 1 // adjust to 1 index-based
-        Column = 0
+        Line = pos.Line
+        Column = pos.Column
         DisplayText = actualOpen
         InsertText = openText
         ScopeKind = Some ic.ScopeKind }
