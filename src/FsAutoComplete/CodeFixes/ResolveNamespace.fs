@@ -75,8 +75,12 @@ let fix
       let getLine = (fun p ->
         let lspLine = (Conversions.fcsPosToLsp p).Line
         if lspLine < 0 || text.GetLineCount() <= lspLine then None else text.GetLineString lspLine |> Some)
+
       let insertion = OpenNamespace.insertNearest ns ns _ast _pos.Line getLine
-      let edits = [| yield insertLine (insertion.Line - 1) (insertion.Column) (insertion.InsertText) |]
+      let edits = [|
+        yield insertLine (insertion.Line - 1) // back to editor pos
+                         (insertion.Column)
+                         (insertion.InsertText) |]
 
       { Edits = edits
         File = file
@@ -121,7 +125,6 @@ let fix
         let ops =
           opens
           |> List.map (openFix lines codeActionParameter.TextDocument diagnostic word tyRes.GetAST pos)
-          // |> List.map (openFix lines codeActionParameter.TextDocument diagnostic word)
 
         return [ yield! ops; yield! quals ]
     })

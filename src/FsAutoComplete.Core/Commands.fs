@@ -204,7 +204,10 @@ module OpenNamespace =
         | Pos(1, _) -> insertPos
         | Pos(l, 0) ->
           let prev = getLine (insertPos.DecLine())
-          if prev.Contains("namespace ", StringComparison.Ordinal) || prev.Contains("module ", StringComparison.Ordinal) then Position.mkPos l ic.Pos.Column
+
+          // don't try replicate previous line indentation if it's a module/namespace declaration
+          if prev.Contains("namespace ", StringComparison.Ordinal)
+             || prev.Contains("module ", StringComparison.Ordinal) then Position.mkPos l ic.Pos.Column
           else
             let indentation = detectIndentation prev
 
@@ -221,7 +224,7 @@ module OpenNamespace =
 
       { Namespace = ns
         Line = pos.Line
-        Column = pos.Column
+        Column = 0
         DisplayText = actualOpen
         InsertText = openText
         ScopeKind = Some ic.ScopeKind }
@@ -832,19 +835,19 @@ module Commands =
     (pos: Position)
     getLine
     : CompletionNamespaceInsert option =
-    // let getLine (p: Position) = getLine p |> Option.defaultValue ""
-
     option {
       let! n = decl.NamespaceToOpen
       let! ast = (currentAst())
       let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos.Line getLine
       let! scopeKind = insertion.ScopeKind
+
+      let identation = insertion.InsertText |> Seq.takeWhile((=)' ') |> Seq.length
       return
         { Namespace = insertion.Namespace
-          Position = Position.mkPos (insertion.Line) (insertion.Column)
+          Position = Position.mkPos (insertion.Line) identation
           Scope = scopeKind }
     }
-        
+
   let symbolUseWorkspaceAux
     (getDeclarationLocation: FSharpSymbolUse * IFSACSourceText -> Async<SymbolDeclarationLocation option>)
     (findReferencesForSymbolInFile: (string<LocalPath> * CompilerProjectOption * FSharpSymbol) -> Async<Range seq>)
