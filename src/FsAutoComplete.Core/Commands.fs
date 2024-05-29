@@ -143,12 +143,15 @@ module OpenNamespace =
     | false, _ -> retVal
 
   let insertAtTop
-    (text: ISourceText)
+    (getLine: pos -> string option)
     (actualOpen: string)
     (ns: string)
-    (ctx: InsertionContext)
+    (ctx: unit -> InsertionContext)
    =
-    let getLine p = if p < 0 then None else text.GetLineString p |> Some
+    let getLine (l: int) =
+      let p = (Position.mkPos l 0)
+      if p.Line < 0 then None else getLine p
+    let ctx = ctx()
     let insertPoint = adjustInsertionPoint getLine ctx OpenStatementInsertionPoint.TopLevel
     let docLine = insertPoint
  
@@ -160,20 +163,19 @@ module OpenNamespace =
           // HACK: This is a work around for inheriting the correct column of the current module
           // It seems the column we get from FCS is incorrect
           let previousLine = docLine - 1
-          let insertionPointIsNotOutOfBoundsOfTheFile = docLine > 0
 
-          let theThereAreOtherOpensInThisModule () = text.GetLineString(previousLine).Contains "open "
-
-          if insertionPointIsNotOutOfBoundsOfTheFile && theThereAreOtherOpensInThisModule () then
-            text.GetLineString(previousLine) |> detectIndentation
-          else
-            ctx.Pos.Column
+          match getLine previousLine with
+          | Some (Contains "open " lineWithOpen) ->
+              lineWithOpen |> detectIndentation
+          | _ -> ctx.Pos.Column
 
         String.replicate column " "
 
       // Ensure a linebreak between open and next statement
       let lineBreaks =
-        if text.GetLineString(docLine).Trim() |> String.IsNullOrEmpty then "\n" else $"\n\n"
+        match getLine docLine with
+        | Some (IsNullOrWhiteSpace _) -> "\n"
+        | _ -> $"\n\n"
 
       $"%s{whitespace}%s{openText}%s{lineBreaks}"
 
@@ -229,18 +231,17 @@ module OpenNamespace =
         ScopeKind = Some ic.ScopeKind }
 
   let insertNamespace
-    (text: ISourceText)
     (actualOpen: string)
     (ns: string)
-    (ctx: InsertionContext)
+    (ctx: unit -> InsertionContext)
     (fullName: string)
     (ast: FSharp.Compiler.Syntax.ParsedInput)
     (pos: Position)
     (getLine: pos -> string option)
-    (openNamespacePreference: OpenStatementInsertionPoint) 
+    (openNamespacePreference: OpenStatementInsertionPoint)
     =
     match openNamespacePreference with
-    | OpenStatementInsertionPoint.TopLevel -> insertAtTop text actualOpen ns ctx
+    | OpenStatementInsertionPoint.TopLevel -> insertAtTop getLine actualOpen ns ctx
     | OpenStatementInsertionPoint.Nearest -> insertNearest ns fullName ast pos.Line getLine
 
 module Commands =
@@ -835,7 +836,9 @@ module Commands =
     option {
       let! n = decl.NamespaceToOpen
       let! ast = (currentAst())
-      let insertion = OpenNamespace.insertNearest n (decl.FullName) ast pos.Line getLine
+      let ctx = fun () -> ParsedInput.FindNearestPointToInsertOpenDeclaration pos.Line ast (n.Split '.') OpenStatementInsertionPoint.Nearest
+      let insertion = OpenNamespace.insertNamespace n n ctx n ast pos getLine OpenStatementInsertionPoint.Nearest
+
       let! scopeKind = insertion.ScopeKind
 
       let identation = insertion.InsertText |> Seq.takeWhile((=)' ') |> Seq.length

@@ -65,14 +65,17 @@ let fix
     file
     diagnostic
     (word: string)
-    (_ast: FSharp.Compiler.Syntax.ParsedInput)
-    (_pos: FcsPos)
+    (ast: FSharp.Compiler.Syntax.ParsedInput)
+    (pos: FcsPos)
     (ns, name: string, ctx, _multiple)
     : Fix =
 
-    let getLine = (fun p ->
-      let lspLine = (Conversions.fcsPosToLsp p).Line
-      if lspLine < 0 || text.GetLineCount() <= lspLine then None else text.GetLineString lspLine |> Some)
+    let getLine = (fun (p: pos) ->
+      //HACK: WHY WHY WHY ?
+      if openNamespacePreference = OpenStatementInsertionPoint.Nearest then
+        let lspLine = (Conversions.fcsPosToLsp p).Line
+        if lspLine < 0 || text.GetLineCount() <= lspLine then None else text.GetLineString lspLine |> Some
+      else text.GetLineString p.Line |> Some)
 
     let actualOpen =
       if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
@@ -82,7 +85,7 @@ let fix
       else
         ns
 
-    let insertion = OpenNamespace.insertNamespace text actualOpen ns ctx ns _ast _pos getLine openNamespacePreference
+    let insertion = OpenNamespace.insertNamespace actualOpen ns (fun () -> ctx) ns ast pos getLine openNamespacePreference
     //HACK back to editor pos
     let adjustment = if openNamespacePreference = OpenStatementInsertionPoint.Nearest then 1 else 0
     let edits = [| yield insertLine (insertion.Line - adjustment) 0 (insertion.InsertText) |]

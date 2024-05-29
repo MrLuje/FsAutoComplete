@@ -219,6 +219,8 @@ val splitByPrefix2: prefixes: string list -> s: string -> (string * string) opti
 module Patterns =
   val (|StartsWith|_|): pat: string -> str: string -> string option
   val (|Contains|_|): pat: string -> str: string -> string option
+  val (|IsNullOrWhiteSpace|_|): str: string -> string option
+
 
 module Version =
   open System.Reflection

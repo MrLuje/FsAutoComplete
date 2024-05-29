@@ -718,6 +718,12 @@ module Patterns =
     | _ when str.Contains pat -> Some str
     | _ -> None
 
+  let (|IsNullOrWhiteSpace|_|) (str: string) =
+    if String.IsNullOrWhiteSpace(str) then
+      Some str
+    else
+      None
+
 
 module Version =
 
