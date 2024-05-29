@@ -230,8 +230,6 @@ module OpenNamespace =
 
   let insertNamespace
     (text: ISourceText)
-    // (name: string)
-    // (word: string)
     (actualOpen: string)
     (ns: string)
     (ctx: InsertionContext)

@@ -69,42 +69,29 @@ let fix
     (_pos: FcsPos)
     (ns, name: string, ctx, _multiple)
     : Fix =
-    
-    match openNamespacePreference with
-    | OpenStatementInsertionPoint.Nearest ->
-      let getLine = (fun p ->
-        let lspLine = (Conversions.fcsPosToLsp p).Line
-        if lspLine < 0 || text.GetLineCount() <= lspLine then None else text.GetLineString lspLine |> Some)
 
-      let insertion = OpenNamespace.insertNearest ns ns _ast _pos.Line getLine
-      let edits = [|
-        yield insertLine (insertion.Line - 1) // back to editor pos
-                         (insertion.Column)
-                         (insertion.InsertText) |]
+    let getLine = (fun p ->
+      let lspLine = (Conversions.fcsPosToLsp p).Line
+      if lspLine < 0 || text.GetLineCount() <= lspLine then None else text.GetLineString lspLine |> Some)
 
-      { Edits = edits
-        File = file
-        SourceDiagnostic = Some diagnostic
-        Title = insertion.DisplayText
-        Kind = FixKind.Fix }
+    let actualOpen =
+      if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
+        let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
 
-    | OpenStatementInsertionPoint.TopLevel -> 
-      let actualOpen =
-        if name.EndsWith(word, StringComparison.Ordinal) && name <> word then
-          let prefix = name.Substring(0, name.Length - word.Length).TrimEnd('.')
+        $"%s{ns}.%s{prefix}"
+      else
+        ns
 
-          $"%s{ns}.%s{prefix}"
-        else
-          ns
+    let insertion = OpenNamespace.insertNamespace text actualOpen ns ctx ns _ast _pos getLine openNamespacePreference
+    //HACK back to editor pos
+    let adjustment = if openNamespacePreference = OpenStatementInsertionPoint.Nearest then 1 else 0
+    let edits = [| yield insertLine (insertion.Line - adjustment) 0 (insertion.InsertText) |]
 
-      let insertion = OpenNamespace.insertAtTop text actualOpen ns ctx 
-      let edits = [| yield insertLine (insertion.Line) 0 (insertion.InsertText) |]
-
-      { Edits = edits
-        File = file
-        SourceDiagnostic = Some diagnostic
-        Title = insertion.DisplayText
-        Kind = FixKind.Fix }
+    { Edits = edits
+      File = file
+      SourceDiagnostic = Some diagnostic
+      Title = insertion.DisplayText
+      Kind = FixKind.Fix }
 
   Run.ifDiagnosticByCheckMessage undefinedName (fun diagnostic codeActionParameter ->
     asyncResult {
