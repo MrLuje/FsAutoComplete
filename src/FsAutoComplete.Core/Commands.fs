@@ -93,13 +93,13 @@ module OpenNamespace =
 
   let private detectIndentation (line: string) = line |> Seq.takeWhile ((=) ' ') |> Seq.length
 
-  /// Going up from position, find the first line that match the statement and set the position below it. 
+  /// Going up from position, find the first line that match the statement and set the position below it.
   /// if not found returns the current pos
-  let private findLineBelowStatement (getLine: int -> string ) (statement: string) (pos: pos) =
+  let private findLineBelowStatement (getLine: int -> string ) (statementPredicate: string -> bool) (pos: pos) =
     pos.LinesToBeginning()
     |> Seq.tryFind (fun pos ->
-      let lineStr = getLine pos.Line
-      lineStr.StartsWith(statement, StringComparison.Ordinal))
+      let lineStr = (getLine pos.Line).TrimStart()
+      statementPredicate lineStr)
     |> function
       | Some pos -> pos.IncLine().Line
       | None -> pos.Line
@@ -123,11 +123,12 @@ module OpenNamespace =
       | OpenStatementInsertionPoint.TopLevel, ScopeKind.TopModule -> 1
       | _, ScopeKind.Namespace ->
           // from insert position go up until namespace
-          findLineBelowStatement getLine "namespace " ctx.Pos
-      | _ -> l
-
-    // ensure adjacent to previous opens
-    let retVal = findLineBelowStatement getLine "open " (Position.mkPos retVal 0)
+          findLineBelowStatement getLine (fun line -> line.StartsWith("namespace ")) (ctx.Pos.IncLine())
+      | _ ->
+        findLineBelowStatement getLine (fun line -> line.StartsWith("open ", StringComparison.Ordinal)
+                                                             || line.StartsWith("module ", StringComparison.Ordinal)
+                                                             || line.StartsWith("namespace ", StringComparison.Ordinal))
+                                                              (Position.mkPos l 0)
 
     let containsAttribute (x: string) = x.Contains "[<"
     let currentLine =
@@ -196,8 +197,6 @@ module OpenNamespace =
       let insertPos = Position.mkPos insertPoint 0
       let getLine p = getLine p |> Option.defaultValue ""
 
-      //TODO: unite with `CodeFix/ResolveNamespace`
-      //TODO: Handle Nearest AND TopLevel. Currently it's just Nearest (vs. ResolveNamespace -> TopLevel) (#789)
       // adjust column
       let pos =
         match insertPos with
