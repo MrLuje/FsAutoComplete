@@ -95,7 +95,7 @@ module Commands =
   let commandsLogger = LogProvider.getLoggerByName "Commands"
 
   let fsharpLintLogger = LogProvider.getLoggerByName "FSharpLint"
-  let fsharpLintService: FSharpLintService = new LSPFSharpLintService() :> FSharpLintService
+  let fsharpLintService: IFSharpLintService = new LSPFSharpLintService() :> IFSharpLintService
 
   /// Extracts the case name(s) from an active pattern name string.
   /// For partial patterns like "|CaseName|_|" returns "CaseName"

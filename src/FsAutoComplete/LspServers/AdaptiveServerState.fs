@@ -785,9 +785,9 @@ type AdaptiveState
                         | Some fix ->
                             Some ([ { Range = Lint.lintRangeToLsp fix.FromRange; NewText = fix.ToText } ])
                           |> Option.map Ionide.LanguageServerProtocol.Server.serialize
-                      let uri = Option.ofObj w.HelpUrl |> Option.map (fun url -> { Href = Some (Uri url) })
+                      let uri = Option.ofObj w.HelpUrl |> Option.map (fun url -> { Href = (URI url) })
                       { Range = range
-                        Code = Some w.Code
+                        Code = Some (U2.C2 w.Code)
                         Severity = Some DiagnosticSeverity.Information
                         Source = Some "F# Linter"
                         Message = w.Warning.Details.Message

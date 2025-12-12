@@ -45,10 +45,10 @@ let enrichLintWarning (w: ClientLintWarning) : EnrichedLintWarning =
 
 let lintRangeToLsp (range: ClientRange): Ionide.LanguageServerProtocol.Types.Range =
   { Start =
-      { Line = range.StartLine - 1
+      { Line = uint32 range.StartLine - 1u
         Character = uint32 range.StartColumn }
     End =
-      { Line = range.EndLine - 1
+      { Line = uint32 range.EndLine - 1u
         Character = uint32 range.EndColumn } }
 
 let lintFile ast (sourceCode: ISourceText) filePath typeCheckResults =
